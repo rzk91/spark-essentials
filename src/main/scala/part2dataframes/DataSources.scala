@@ -19,18 +19,14 @@ object DataSources extends App with SparkCommon {
       - path -> provide the path where the data is located (call just .load() afterwards)
       - ...
    */
-  val carsDf = spark.read
-    .format("json")
-    .schema(carSchema)
-    .option("mode", "failFast")
-    .load(dataPath("cars"))
+  val carsDf = readDf(spark, "cars.json", Some(carSchema), options = Map("mode" -> "failFast"))
 
   val carsDfWithOptionMap = spark.read
     .format("json")
     .options(
       Map(
         "mode"        -> "failFast",
-        "path"        -> dataPath("cars"),
+        "path"        -> dataPath("cars.json"),
         "inferSchema" -> "true"
       )
     )
@@ -48,19 +44,24 @@ object DataSources extends App with SparkCommon {
   carsDf.write
     .format("json")
     .mode(SaveMode.Overwrite)
-    .option("path", dataPath("cars_duplicate"))
-//    .save()
+    .option("path", dataPath("cars_duplicate.json"))
+
+  writeDf(carsDf, spark, "cars_duplicate.json")
 
   // Formats
   val newCarSchema = carSchema.changeType("Year", DateType)
 
   // JSON flags
-  spark.read
-    .schema(newCarSchema)
-    .option("dateFormat", "YYYY-MM-dd")    // If Spark fails while parsing, it will put null
-    .option("allowSingleQuotes", "true")   // Useful if JSONs use ' instead of "
-    .option("compression", "uncompressed") // bzip2, gzip, lz4, snappy, deflate, uncompressed
-    .json(dataPath("cars"))
+  readDf(
+    spark,
+    "cars.json",
+    Some(newCarSchema),
+    options = Map(
+      "dateFormat"        -> "YYYY-MM-dd",  // If Spark fails while parsing, it will put null
+      "allowSingleQuotes" -> "true",        // Useful if JSONs use ' instead of "
+      "compression"       -> "uncompressed" // bzip2, gzip, lz4, snappy, deflate, uncompressed
+    )
+  )
 
   // CSV flags
   val stocksSchema = StructType(
@@ -71,23 +72,36 @@ object DataSources extends App with SparkCommon {
     )
   )
 
-  spark.read
-    .schema(stocksSchema)
-    .option("dateFormat", "MMM dd yyyy")
-    .option("header", "true")
-    .option("sep", ",")
-    .option("nullValue", "")
-    .csv(dataPath("stocks", "csv"))
+  readDf(
+    spark,
+    "stocks.csv",
+    Some(stocksSchema),
+    options = Map(
+      "dateFormat" -> "MMM dd yyyy",
+      "header"     -> "true",
+      "sep"        -> ",",
+      "nullValue"  -> ""
+    )
+  )
 //    .show()
 
-  // Parquet flags
-  carsDf.write
-    .mode(SaveMode.Overwrite)
+  // Parquet flags (default when .save is called without specifying a format)
+  carsDf.write.mode(SaveMode.Overwrite)
 //    .save(dataPath("cars", "parquet")) // Automatically inferred as parquet
 
+  writeDf(
+    carsDf,
+    spark,
+    "cars_parquet",
+    "parquet"
+  )
+
   // Text files
-  spark.read
-    .text(dataPath("sample_text", "txt"))
+  readDf(
+    spark,
+    "sample_text.txt",
+    format = Some("text")
+  )
 //    .show()
 
   // Reading from a remote database (e.g. PostgreSQL)
@@ -95,6 +109,7 @@ object DataSources extends App with SparkCommon {
   val dbUrl = "jdbc:postgresql://localhost:25432/rtjvm"
   val username = "docker"
   val password = "docker"
+
   val properties = Map(
     "driver"   -> driver,
     "user"     -> username,
@@ -111,6 +126,19 @@ object DataSources extends App with SparkCommon {
       .option("dbtable", "public.employees")
       .load()
 
+    val anotherOption = readDf(
+      spark,
+      "",
+      format = Some("jdbc"),
+      options = Map(
+        "driver"   -> driver,
+        "url"      -> dbUrl,
+        "user"     -> username,
+        "password" -> password,
+        "dbtable"  -> "public.employees"
+      )
+    )
+
     val betterOption = spark.read
       .jdbc(
         url = dbUrl,
@@ -118,10 +146,10 @@ object DataSources extends App with SparkCommon {
         properties = properties
       )
 
-    betterOption
+    anotherOption
   }
 
-//  employeesDf.show()
+  employeesDf.show()
 
   /**
     * Exercise: Read the movies DF and then write it as
@@ -129,28 +157,62 @@ object DataSources extends App with SparkCommon {
     *  - snappy parquet
     *  - table "public.movies" in the Postgres DB
     */
-  val moviesDf = spark.read.json(dataPath("movies"))
+  val moviesDf = readDf(spark, "movies.json")
 
   // 1. TSVs
-  moviesDf.write
-    .mode(SaveMode.Overwrite)
-    .option("header", "true")
-    .option("sep", "\t")
-//    .option("nullValue", "") // default
-    .csv(dataPath("movies", "csv"))
+  writeDf(
+    moviesDf,
+    spark,
+    "movies",
+    "csv",
+    options = Map(
+      "header" -> "true",
+      "sep"    -> "\t"
+//        "nullValue" -> "" // default
+    )
+  )
+
+  // moviesDf.write
+  //    .mode(SaveMode.Overwrite)
+  //    .option("header", "true")
+  //    .option("sep", "\t")
+  //    .csv(dataPath("movies", "csv"))
 
   // 2. Snappy parquet
-  moviesDf.write
-    .mode(SaveMode.Overwrite)
-//    .option("compression", "snappy") // Default is snappy
-    .save(dataPath("movies", "parquet"))
+  writeDf(
+    moviesDf,
+    spark,
+    "movies",
+    "parquet"
+//    options = Map(
+//      "compression" -> "snappy" // Default is snappy
+//    )
+  )
+
+//  moviesDf.write
+//    .mode(SaveMode.Overwrite)
+//    .save(dataPath("movies", "parquet"))
 
   // 3. Postgres DB table
-  moviesDf.write
-    .mode(SaveMode.Overwrite)
-    .jdbc(
-      url = dbUrl,
-      table = "public.movies",
-      connectionProperties = properties
+  writeDf(
+    moviesDf,
+    spark,
+    "movies",
+    "jdbc",
+    options = Map(
+      "driver"   -> driver,
+      "url"      -> dbUrl,
+      "user"     -> username,
+      "password" -> password,
+      "dbtable"  -> "public.movies"
     )
+  )
+
+//  moviesDf.write
+//    .mode(SaveMode.Overwrite)
+//    .jdbc(
+//      url = dbUrl,
+//      table = "public.movies",
+//      connectionProperties = properties
+//    )
 }

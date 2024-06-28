@@ -9,10 +9,7 @@ object DataFramesBasics extends App with SparkCommon {
   val spark = simpleSparkSession("DataFrames Basics")
 
   // Read data frames
-  val firstDF: DataFrame = spark.read
-    .format("json")
-    .option("inferSchema", "true")
-    .load(dataPath("cars"))
+  val firstDF: DataFrame = readDf(spark, "cars.json")
 
   def firstLook(): Unit = {
     firstDF.show()
@@ -32,17 +29,16 @@ object DataFramesBasics extends App with SparkCommon {
   // In production, do not use "inferSchema" since Spark can mess things up
   // So, read a DF with our own schema
 
-  val carsWithDFSchema = spark.read
-    .format("json")
-    .schema(carSchema)
-    .load(dataPath("cars"))
+  val carsWithDFSchema = readDf(spark, "cars.json", Some(carSchema))
 
   // Create rows by hand
   val aCarRow =
     Row("chevrolet chevelle malibu", 18.0, 8L, 307.0, 130L, 3504L, 12.0, "1970-01-01", "USA")
 
   // Create DF from tuples
-  val newCarTuples = Seq(
+  // Using implicits
+  import spark.implicits._
+  val newCarTuples = List(
     ("chevrolet chevelle malibu", 18.0, 8L, 307.0, 130L, 3504L, 12.0, "1970-01-01", "USA"),
     ("pontiac catalina", 14.0, 8L, 455.0, 225L, 4425L, 10.0, "1970-01-01", "USA")
   )
@@ -50,12 +46,10 @@ object DataFramesBasics extends App with SparkCommon {
   val manualCarsDF = spark.createDataFrame(newCarTuples) // Schema is inferred by compiler based on tuple types
 
   // NOTE: DFs have schemas, Rows do not
-  val dfUsingJsonReader = spark.read.schema(carSchema).json(dataPath("cars"))
+  val dfUsingJsonReader = spark.read.schema(carSchema).json(dataPath("cars.json"))
 
 //  dfUsingJsonReader.show() // Works just fine!
 
-  // Using implicits
-  import spark.implicits._
   val dfWithImplicits = newCarTuples.toDF()
 
 //  dfWithImplicits.printSchema()
@@ -71,7 +65,7 @@ object DataFramesBasics extends App with SparkCommon {
     */
 
   // 1. Smartphones
-  val smartphones = Seq(
+  val smartphones = List(
     ("iPhone", "15", "6.2", "48"),
     ("Google", "Pixel 7", "6.7", "50"),
     ("Sony", "Xperia Z", "5.4", "12")
@@ -91,7 +85,7 @@ object DataFramesBasics extends App with SparkCommon {
     )
   )
 
-  val guitarsDF = spark.read.schema(guitarSchema).format("json").load(dataPath("guitars"))
+  val guitarsDF = readDf(spark, "guitars.json", Some(guitarSchema))
   guitarsDF.printSchema()
   println(s"Number of rows in guitars data frame: ${guitarsDF.count()}")
 }
