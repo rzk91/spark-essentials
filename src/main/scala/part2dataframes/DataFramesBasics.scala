@@ -1,20 +1,18 @@
 package part2dataframes
 
-import org.apache.spark.sql.types.{DoubleType, LongType, StringType, StructField, StructType}
-import org.apache.spark.sql.{DataFrame, Row, SparkSession}
+import common.SparkCommon
+import org.apache.spark.sql.types._
+import org.apache.spark.sql.{DataFrame, Row}
 
-object DataFramesBasics extends App {
+object DataFramesBasics extends App with SparkCommon {
 
-  val spark: SparkSession = SparkSession.builder()
-    .appName("DataFrames Basics")
-    .config("spark.master", "local")
-    .getOrCreate()
+  val spark = simpleSparkSession("DataFrames Basics")
 
   // Read data frames
   val firstDF: DataFrame = spark.read
     .format("json")
     .option("inferSchema", "true")
-    .load("src/main/resources/data/cars.json")
+    .load(dataPath("cars"))
 
   def firstLook(): Unit = {
     firstDF.show()
@@ -26,17 +24,7 @@ object DataFramesBasics extends App {
   val longType = LongType
 
   // Schema of 'Cars' table
-  val carSchema = StructType(Array(
-    StructField("Name", StringType),
-    StructField("Miles_per_Gallon", DoubleType),
-    StructField("Cylinders", LongType),
-    StructField("Displacement", DoubleType),
-    StructField("Horsepower", LongType),
-    StructField("Weight_in_lbs", LongType),
-    StructField("Acceleration", DoubleType),
-    StructField("Year", StringType),
-    StructField("Origin", StringType)
-  ))
+  val carSchema = sampleSchema
 
   // Get schema of a data frame
 //  println(firstDF.schema)
@@ -47,21 +35,22 @@ object DataFramesBasics extends App {
   val carsWithDFSchema = spark.read
     .format("json")
     .schema(carSchema)
-    .load("src/main/resources/data/cars.json")
+    .load(dataPath("cars"))
 
   // Create rows by hand
-  val aCarRow = Row("chevrolet chevelle malibu",18.0,8L,307.0,130L,3504L,12.0,"1970-01-01","USA")
+  val aCarRow =
+    Row("chevrolet chevelle malibu", 18.0, 8L, 307.0, 130L, 3504L, 12.0, "1970-01-01", "USA")
 
   // Create DF from tuples
   val newCarTuples = Seq(
-    ("chevrolet chevelle malibu",18.0,8L,307.0,130L,3504L,12.0,"1970-01-01","USA"),
-    ("pontiac catalina",14.0,8L,455.0,225L,4425L,10.0,"1970-01-01","USA")
+    ("chevrolet chevelle malibu", 18.0, 8L, 307.0, 130L, 3504L, 12.0, "1970-01-01", "USA"),
+    ("pontiac catalina", 14.0, 8L, 455.0, 225L, 4425L, 10.0, "1970-01-01", "USA")
   )
 
   val manualCarsDF = spark.createDataFrame(newCarTuples) // Schema is inferred by compiler based on tuple types
 
   // NOTE: DFs have schemas, Rows do not
-  val dfUsingJsonReader = spark.read.schema(carSchema).json("src/main/resources/data/cars.json")
+  val dfUsingJsonReader = spark.read.schema(carSchema).json(dataPath("cars"))
 
 //  dfUsingJsonReader.show() // Works just fine!
 
@@ -73,13 +62,13 @@ object DataFramesBasics extends App {
 //  newCarTuples.toDF("Name", "MPG", "Cylinders", "Displacement", "HP", "Weight", "Acceleration", "Year", "Origin").printSchema()
 
   /**
-   * Exercises
-   * 1. Create a manual DF describing smartphones
-   *  - Make, model, screen dimension, camera megapixels
-   * 2. Read another file from data folder
-   *  - print schema
-   *  - count number of rows
-   */
+    * Exercises
+    * 1. Create a manual DF describing smartphones
+    *  - Make, model, screen dimension, camera megapixels
+    * 2. Read another file from data folder
+    *  - print schema
+    *  - count number of rows
+    */
 
   // 1. Smartphones
   val smartphones = Seq(
@@ -88,7 +77,8 @@ object DataFramesBasics extends App {
     ("Sony", "Xperia Z", "5.4", "12")
   )
 
-  val smartphonesDF = smartphones.toDF("Make", "Model", "Screen Dimension (inches)", "Camera Megapixels")
+  val smartphonesDF =
+    smartphones.toDF("Make", "Model", "Screen Dimension (inches)", "Camera Megapixels")
   smartphonesDF.show()
 
   // 2. Read guitars
@@ -101,7 +91,7 @@ object DataFramesBasics extends App {
     )
   )
 
-  val guitarsDF = spark.read.schema(guitarSchema).format("json").load("src/main/resources/data/guitars.json")
+  val guitarsDF = spark.read.schema(guitarSchema).format("json").load(dataPath("guitars"))
   guitarsDF.printSchema()
   println(s"Number of rows in guitars data frame: ${guitarsDF.count()}")
 }
