@@ -69,6 +69,39 @@ object DataFramesBasics extends App {
   import spark.implicits._
   val dfWithImplicits = newCarTuples.toDF()
 
-  dfWithImplicits.printSchema()
-  newCarTuples.toDF("Name", "MPG", "Cylinders", "Displacement", "HP", "Weight", "Acceleration", "Year", "Origin").printSchema()
+//  dfWithImplicits.printSchema()
+//  newCarTuples.toDF("Name", "MPG", "Cylinders", "Displacement", "HP", "Weight", "Acceleration", "Year", "Origin").printSchema()
+
+  /**
+   * Exercises
+   * 1. Create a manual DF describing smartphones
+   *  - Make, model, screen dimension, camera megapixels
+   * 2. Read another file from data folder
+   *  - print schema
+   *  - count number of rows
+   */
+
+  // 1. Smartphones
+  val smartphones = Seq(
+    ("iPhone", "15", "6.2", "48"),
+    ("Google", "Pixel 7", "6.7", "50"),
+    ("Sony", "Xperia Z", "5.4", "12")
+  )
+
+  val smartphonesDF = smartphones.toDF("Make", "Model", "Screen Dimension (inches)", "Camera Megapixels")
+  smartphonesDF.show()
+
+  // 2. Read guitars
+  val guitarSchema = StructType(
+    Array(
+      StructField("id", LongType, nullable = false),
+      StructField("model", StringType, nullable = false),
+      StructField("make", StringType, nullable = false),
+      StructField("type", StringType, nullable = false)
+    )
+  )
+
+  val guitarsDF = spark.read.schema(guitarSchema).format("json").load("src/main/resources/data/guitars.json")
+  guitarsDF.printSchema()
+  println(s"Number of rows in guitars data frame: ${guitarsDF.count()}")
 }
