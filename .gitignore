@@ -124,6 +124,7 @@ project/plugins/project/
 .ensime_lucene
 .generated-mima*
 .idea/
+.bsp/
 .project
 .pydevproject
 .scala_dependencies
